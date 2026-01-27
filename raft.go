@@ -32,6 +32,9 @@ type RaftState struct {
 	cluster       *ClusterConfig
 	lastHeartbeat time.Time // Last time we received a heartbeat (for followers)
 
+	// Leader's API address (for redirects); set when we receive AppendEntries from leader
+	leaderAPIAddress string
+
 	// Persistence
 	statePath string // Path to persisted state file
 }
@@ -147,6 +150,13 @@ func (r *RaftState) GetRole() NodeRole {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.role
+}
+
+// GetLeaderAPIAddress returns the leader's API address (for redirects); set when we receive AppendEntries
+func (r *RaftState) GetLeaderAPIAddress() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.leaderAPIAddress
 }
 
 // GetCommitIndex returns the commit index
