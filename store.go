@@ -10,18 +10,26 @@ import (
 
 // Store represents the main KV store that combines MemTable and WAL
 type Store struct {
-	memTable    *MemTable
-	wal         *WAL
-	walPath     string
-	sstableDir  string
-	sstables    []*SSTable
-	sequenceNum int64
-	mu          sync.RWMutex
+	memTable     *MemTable
+	wal          *WAL
+	walPath      string
+	sstableDir   string
+	sstables     []*SSTable
+	sequenceNum  int64
+	compactor    *Compactor
+	maxSSTables  int // Maximum number of SSTables before compaction
+	mu           sync.RWMutex
 }
 
 // NewStore creates a new Store instance
 // It will create/recover from WAL if walPath is provided
+// maxSSTables is the maximum number of SSTables before compaction is triggered (default: 5)
 func NewStore(memTableMaxSize int64, walPath string, sstableDir string) (*Store, error) {
+	return NewStoreWithCompaction(memTableMaxSize, walPath, sstableDir, 5)
+}
+
+// NewStoreWithCompaction creates a new Store instance with custom compaction settings
+func NewStoreWithCompaction(memTableMaxSize int64, walPath string, sstableDir string, maxSSTables int) (*Store, error) {
 	memTable := NewMemTable(memTableMaxSize)
 
 	var wal *WAL
@@ -55,6 +63,8 @@ func NewStore(memTableMaxSize int64, walPath string, sstableDir string) (*Store,
 		sstableDir:  sstableDir,
 		sstables:    make([]*SSTable, 0),
 		sequenceNum: 1,
+		maxSSTables: maxSSTables,
+		compactor:   NewCompactor(sstableDir, maxSSTables),
 	}
 
 	// Load existing SSTables
@@ -306,8 +316,53 @@ func (s *Store) FlushMemTable() error {
 	// Clear MemTable and truncate WAL
 	s.memTable.Clear()
 	if s.wal != nil {
-		return s.wal.Truncate()
+		if err := s.wal.Truncate(); err != nil {
+			return err
+		}
 	}
+
+	// Check if compaction should be triggered
+	s.mu.RLock()
+	sstableCount := len(s.sstables)
+	s.mu.RUnlock()
+
+	if s.compactor.ShouldCompact(sstableCount) {
+		if err := s.Compact(); err != nil {
+			// Log error but don't fail the flush operation
+			// The flush was successful, compaction can be retried later
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Compact performs compaction on the Store's SSTables
+// This is a public API for manually triggering compaction
+// Note: Automatic compaction happens after flush when threshold is reached
+func (s *Store) Compact() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.sstables) < 2 {
+		return nil // Need at least 2 SSTables to compact
+	}
+
+	// Compact all SSTables into one
+	mergedPath, err := s.compactor.Compact(s.sstables, s.sequenceNum)
+	if err != nil {
+		return err
+	}
+
+	// Open merged SSTable
+	mergedSST, err := OpenSSTable(mergedPath)
+	if err != nil {
+		return err
+	}
+
+	// Replace all SSTables with merged one
+	s.sstables = []*SSTable{mergedSST}
+	s.sequenceNum++
 
 	return nil
 }
