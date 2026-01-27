@@ -125,7 +125,20 @@ func (s *Store) Put(key, value []byte) error {
 	}
 
 	// Apply to MemTable
-	return s.memTable.Put(key, value)
+	if err := s.memTable.Put(key, value); err != nil {
+		return err
+	}
+
+	// Check if MemTable should be flushed and flush if needed
+	if s.ShouldFlush() {
+		if err := s.FlushMemTable(); err != nil {
+			// Log error but don't fail the Put operation
+			// The data is already in WAL and MemTable
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Get retrieves a value by key
@@ -241,6 +254,15 @@ func (s *Store) BatchPut(keys, values [][]byte) error {
 	// Apply all to MemTable
 	for i := range keys {
 		if err := s.memTable.Put(keys[i], values[i]); err != nil {
+			return err
+		}
+	}
+
+	// Check if MemTable should be flushed and flush if needed
+	if s.ShouldFlush() {
+		if err := s.FlushMemTable(); err != nil {
+			// Log error but don't fail the BatchPut operation
+			// The data is already in WAL and MemTable
 			return err
 		}
 	}
