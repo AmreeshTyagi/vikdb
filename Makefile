@@ -20,7 +20,7 @@ CLUSTER_ADDRS := localhost:8081,localhost:8083,localhost:8085
 BENCH_ADDR       ?= localhost:8080
 BENCH_RPS        ?= 500
 BENCH_DURATION   ?= 10s
-BENCH_CONCURRENCY ?= 10
+BENCH_CONCURRENCY ?= 5
 
 .PHONY: build build-bench install run run-node1 run-node2 run-node3 run-cluster dev test clean help bench bench-put bench-read bench-range bench-batch bench-delete bench-mixed
 
