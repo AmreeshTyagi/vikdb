@@ -1,0 +1,16 @@
+# Air config for VikDB dev (live reload in basic/single-node mode)
+# Run with: make dev  or  air
+# Install air: go install github.com/air-verse/air@latest
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/vikdb ./cmd/vikdb"
+  bin = "./tmp/vikdb"
+  full_bin = "./tmp/vikdb -addr :8080 -memtable-max-size 104857600 -wal-path ./data/wal -sstable-dir ./data/sstables"
+  exclude_dir = ["tmp", "vendor", "data", ".git", ".cursor"]
+  include_ext = ["go"]
+  exclude_re = ["_test\\.go$"]
+  delay = 1000
+  stop_on_error = true

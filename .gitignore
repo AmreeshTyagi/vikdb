@@ -1,0 +1,18 @@
+# Air / dev tmp
+tmp/
+
+# Local data (WAL, SSTables, raft state) from runs
+data/
+
+# Go
+*.exe
+*.test
+*.out
+vendor/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo

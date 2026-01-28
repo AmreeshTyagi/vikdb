@@ -151,9 +151,9 @@ func (s *Store) Put(key, value []byte) error {
 	return nil
 }
 
-// Get retrieves a value by key
+// Read retrieves a value by key
 // Checks MemTable first, then SSTables (newest to oldest)
-func (s *Store) Get(key []byte) ([]byte, bool) {
+func (s *Store) Read(key []byte) ([]byte, bool) {
 	// Check MemTable first
 	value, exists := s.memTable.Get(key)
 	if exists {
@@ -193,9 +193,9 @@ func (s *Store) Delete(key []byte) error {
 	return s.memTable.Delete(key)
 }
 
-// GetRange returns all key-value pairs in the specified range
+// ReadKeyRange returns all key-value pairs in the specified range
 // Checks MemTable and all SSTables
-func (s *Store) GetRange(startKey, endKey []byte) []KeyValue {
+func (s *Store) ReadKeyRange(startKey, endKey []byte) []KeyValue {
 	result := make([]KeyValue, 0)
 
 	// Get from MemTable
