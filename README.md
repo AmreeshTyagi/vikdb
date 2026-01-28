@@ -256,3 +256,13 @@ go test -v ./...
 - Compression
 - Caching strategies
 - Performance tuning
+
+## Performance benchmark (single node)
+- Read <img width="1838" height="556" alt="image" src="https://github.com/user-attachments/assets/3e56d2f0-8af8-4b5d-913b-95c47abb367f" />
+- Put <img width="1826" height="566" alt="image" src="https://github.com/user-attachments/assets/73a842ee-4dc4-4574-b1d0-97fcb6a86f98" />
+- Delete <img width="1836" height="578" alt="image" src="https://github.com/user-attachments/assets/d2848982-6fa6-42e6-9340-b693336889ca" />
+- BatchPut <img width="1852" height="554" alt="image" src="https://github.com/user-attachments/assets/8ba9c106-c4d0-45b0-9b43-cc7b9e58b4c6" />
+- ReadKeyRange <img width="1820" height="568" alt="image" src="https://github.com/user-attachments/assets/5ecf2bec-cd79-43b8-bd33-7664f03ead89" />
+
+
+
