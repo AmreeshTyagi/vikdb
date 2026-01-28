@@ -18,7 +18,26 @@ A high-performance, persistent Key-Value store built with Go, implementing an LS
 - **SSTables**: Immutable sorted files on disk with in-memory indexes
 - **Compactor**: Merges SSTables to reduce read amplification
 
+See [FLOW_DIAGRAM.md](FLOW_DIAGRAM.md) for detailed data flow diagrams (writes, reads, flush, compaction, replication, leader election, and failover).
+
+## Supported store APIs
+
+- **Put** – store or update a key-value pair
+- **Read** – get a value by key
+- **ReadKeyRange** – get all key-value pairs in a key range (start, end)
+- **Delete** – remove a key
+- **BatchPut** – write multiple key-value pairs in one call
+
 ## Installation
+
+Install dependencies and dev tools (including [air](https://github.com/air-verse/air) for live reload), then build:
+
+```bash
+make install   # install project deps and air
+make build     # build ./vikdb
+```
+
+Or build without the Makefile:
 
 ```bash
 go build ./cmd/vikdb
@@ -174,6 +193,8 @@ curl http://localhost:8080/health
 }
 ```
 
+## See [HA_CLUSTER.md](HA_CLUSTER.md) for usage with replication
+
 ## Key Encoding
 
 All keys and values in API requests/responses are Base64 encoded:
@@ -198,6 +219,18 @@ Error responses follow this format:
 }
 ```
 
+## Testing
+
+Run all tests:
+```bash
+go test ./...
+```
+
+Run with verbose output:
+```bash
+go test -v ./...
+```
+
 ## Implementation Status
 
 ✅ **Core Storage Engine**
@@ -210,3 +243,14 @@ Error responses follow this format:
 - HTTP API endpoints
 - Request/response handling
 - Error handling
+
+✅ **Replication**
+- Multiple nodes with Raft consensus. Assuming not to be used for cross-region.
+- Leader election and heartbeats
+- Log replication and automatic failover
+
+🚧 **Scope of optimization** (Future)
+- Bloom filters
+- Compression
+- Caching strategies
+- Performance tuning
