@@ -79,6 +79,7 @@ func NewStoreWithCompaction(memTableMaxSize int64, walPath string, sstableDir st
 	return s, nil
 }
 
+// loadSSTables discovers *.sst in sstableDir and opens each. Time: O(F·I); F = files, I = total index entries. Space: O(F) handles.
 func (s *Store) loadSSTables() error {
 	if s.sstableDir == "" {
 		return nil
@@ -104,6 +105,7 @@ func (s *Store) loadSSTables() error {
 	return nil
 }
 
+// applyWALEntry applies one WAL entry to the memtable. Time: O(log n) put/delete; n = memtable size. Space: O(len(key)+len(value)).
 func applyWALEntry(memTable *memtable.MemTable, entry wal.WALEntry) error {
 	switch entry.Type {
 	case wal.WALEntryPut:
@@ -115,7 +117,8 @@ func applyWALEntry(memTable *memtable.MemTable, entry wal.WALEntry) error {
 	}
 }
 
-// Put inserts or updates a key-value pair
+// Put inserts or updates a key-value pair. Appends to WAL then memtable; may flush/compact.
+// Time: O(log n) memtable + O(1) WAL append; n = memtable size. Space: O(len(key)+len(value)).
 func (s *Store) Put(key, value []byte) error {
 	if s.wal != nil {
 		entry := wal.WALEntry{
@@ -141,7 +144,8 @@ func (s *Store) Put(key, value []byte) error {
 	return nil
 }
 
-// Read retrieves a value by key
+// Read retrieves a value by key. Checks memtable first, then SSTables newest to oldest.
+// Time: O(log n) memtable + O(S) SSTable lookups in worst case; n = memtable size, S = SSTable count. Space: O(len(value)).
 func (s *Store) Read(key []byte) ([]byte, bool) {
 	value, exists := s.memTable.Get(key)
 	if exists {
@@ -152,6 +156,9 @@ func (s *Store) Read(key []byte) ([]byte, bool) {
 	defer s.mu.RUnlock()
 
 	for i := len(s.sstables) - 1; i >= 0; i-- {
+		// Each Get is a lookup + possible disk read
+		// Disk read can be avoided by using a Bloom filter
+		// to reduce disk I/O on negative lookups
 		value, exists := s.sstables[i].Get(key)
 		if exists {
 			return value, true
@@ -161,7 +168,8 @@ func (s *Store) Read(key []byte) ([]byte, bool) {
 	return nil, false
 }
 
-// Delete removes a key
+// Delete removes a key. Logs to WAL and deletes from memtable.
+// Time: O(log n) memtable; n = len(entries). Space: O(len(key)).
 func (s *Store) Delete(key []byte) error {
 	if s.wal != nil {
 		entry := wal.WALEntry{
@@ -177,7 +185,8 @@ func (s *Store) Delete(key []byte) error {
 	return s.memTable.Delete(key)
 }
 
-// ReadKeyRange returns all key-value pairs in the specified range
+// ReadKeyRange returns all key-value pairs in the specified range. Merges memtable + all SSTables, then deduplicates and sorts.
+// Time: O(m + sum over SSTables of their range cost); m = memtable range size. Space: O(total result size).
 func (s *Store) ReadKeyRange(startKey, endKey []byte) []kv.KeyValue {
 	result := make([]kv.KeyValue, 0)
 
@@ -197,6 +206,7 @@ func (s *Store) ReadKeyRange(startKey, endKey []byte) []kv.KeyValue {
 	return deduplicateAndSort(result)
 }
 
+// deduplicateAndSort returns unique entries sorted by key. Later occurrence wins. Time: O(n log n); n = len(entries). Space: O(n).
 func deduplicateAndSort(entries []kv.KeyValue) []kv.KeyValue {
 	if len(entries) == 0 {
 		return entries
@@ -217,7 +227,8 @@ func deduplicateAndSort(entries []kv.KeyValue) []kv.KeyValue {
 	return unique
 }
 
-// BatchPut performs a batch put operation
+// BatchPut performs a batch put. WAL + memtable per key; may flush/compact.
+// Time: O(b·(log n + WAL)); b = batch size, n = memtable size. Space: O(sum of key+value sizes).
 func (s *Store) BatchPut(keys, values [][]byte) error {
 	if len(keys) != len(values) {
 		return errors.New("keys and values must have the same length")
@@ -256,7 +267,8 @@ func (s *Store) ShouldFlush() bool {
 	return s.memTable.ShouldFlush()
 }
 
-// FlushMemTable writes the MemTable to an SSTable and clears it
+// FlushMemTable writes the MemTable to an SSTable and clears it. May trigger compaction.
+// Time: O(m) disk write for m entries + O(1) new SSTable open. Space: O(1) transient.
 func (s *Store) FlushMemTable() error {
 	entries := s.memTable.GetAllEntries()
 	if len(entries) == 0 {
@@ -300,7 +312,7 @@ func (s *Store) FlushMemTable() error {
 	return nil
 }
 
-// Compact performs compaction on the Store's SSTables
+// Compact merges Store SSTables into one via compactor. Time: O(total entries across SSTables). Space: O(unique keys) during merge.
 func (s *Store) Compact() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -325,7 +337,7 @@ func (s *Store) Compact() error {
 	return nil
 }
 
-// Close closes the WAL file and all SSTables
+// Close closes the WAL file and all SSTables. Time: O(F); F = SSTable count. Space: O(1).
 func (s *Store) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -362,8 +374,8 @@ func (s *Store) GetSSTableCount() int {
 	return len(s.sstables)
 }
 
-// ApplyWALEntry applies a WAL entry to the MemTable only (no WAL write).
-// Used when applying replicated log entries from Raft.
+// ApplyWALEntry applies a WAL entry to the MemTable only (no WAL write). Used when applying replicated log entries from Raft.
+// Time: O(log n) put/delete; n = memtable size. Space: O(len(key)+len(value)).
 func (s *Store) ApplyWALEntry(entry wal.WALEntry) error {
 	switch entry.Type {
 	case wal.WALEntryPut:
@@ -375,8 +387,8 @@ func (s *Store) ApplyWALEntry(entry wal.WALEntry) error {
 	}
 }
 
-// AppendToWAL appends a WAL entry to the WAL file only (no MemTable).
-// Used by ReplicatedStore when persisting replicated entries locally.
+// AppendToWAL appends a WAL entry to the WAL file only (no MemTable). Used by ReplicatedStore when persisting replicated entries locally.
+// Time: O(len(key)+len(value)) disk write. Space: O(1).
 func (s *Store) AppendToWAL(entry wal.WALEntry) error {
 	if s.wal == nil {
 		return nil

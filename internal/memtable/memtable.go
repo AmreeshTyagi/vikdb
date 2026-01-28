@@ -27,7 +27,8 @@ func NewMemTable(maxSize int64) *MemTable {
 	}
 }
 
-// Put inserts or updates a key-value pair
+// Put inserts or updates a key-value pair.
+// Time: O(log n) for update, O(n) for insert due to slice shift; n = len(entries). Space: O(len(key)+len(value)).
 func (mt *MemTable) Put(key, value []byte) error {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
@@ -50,6 +51,7 @@ func (mt *MemTable) Put(key, value []byte) error {
 		// New key, insert it
 		oldValueSize = 0
 		// Insert at the correct position to maintain sorted order
+		// B-tree can be used to improve the time complexity of the insert operation
 		mt.entries = append(mt.entries, kv.KeyValue{})
 		copy(mt.entries[idx+1:], mt.entries[idx:])
 		mt.entries[idx] = kv.KeyValue{Key: keyCopy, Value: valueCopy}
@@ -65,8 +67,8 @@ func (mt *MemTable) Put(key, value []byte) error {
 	return nil
 }
 
-// Get retrieves the value for a given key
-// Returns nil if the key doesn't exist
+// Get retrieves the value for a given key. Returns nil if the key doesn't exist.
+// Time: O(log n), n = len(entries). Space: O(len(value)) for the copied value.
 func (mt *MemTable) Get(key []byte) ([]byte, bool) {
 	mt.mu.RLock()
 	defer mt.mu.RUnlock()
@@ -81,9 +83,8 @@ func (mt *MemTable) Get(key []byte) ([]byte, bool) {
 	return nil, false
 }
 
-// Delete marks a key as deleted (tombstone)
-// In LSM-trees, deletes are handled by inserting a tombstone marker
-// For now, we'll actually remove it from the MemTable
+// Delete marks a key as deleted (tombstone). For now, we actually remove it from the MemTable.
+// Time: O(log n) to find + O(n) to shift; n = len(entries). Space: O(1).
 func (mt *MemTable) Delete(key []byte) error {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
@@ -100,8 +101,9 @@ func (mt *MemTable) Delete(key []byte) error {
 	return nil
 }
 
-// GetRange returns all key-value pairs where startKey <= key < endKey
-// If endKey is nil, it returns all keys >= startKey
+// GetRange returns all key-value pairs where startKey <= key < endKey.
+// If endKey is nil, returns all keys >= startKey.
+// Time: O(log n + k), n = len(entries), k = number of keys in range. Space: O(k).
 func (mt *MemTable) GetRange(startKey, endKey []byte) []kv.KeyValue {
 	mt.mu.RLock()
 	defer mt.mu.RUnlock()
@@ -179,8 +181,8 @@ func (mt *MemTable) IsEmpty() bool {
 	return len(mt.entries) == 0
 }
 
-// GetAllEntries returns all entries in sorted order
-// This is used when flushing the MemTable to disk
+// GetAllEntries returns all entries in sorted order (used when flushing to disk).
+// Time: O(n), n = len(entries). Space: O(n).
 func (mt *MemTable) GetAllEntries() []kv.KeyValue {
 	mt.mu.RLock()
 	defer mt.mu.RUnlock()
@@ -206,7 +208,8 @@ func (mt *MemTable) Clear() {
 	mt.size = 0
 }
 
-// findIndex finds the index where a key should be inserted or exists
+// findIndex returns the smallest index i such that entries[i].Key >= key (lower bound).
+// Binary search - Time: O(log n), n = len(entries). Space: O(1).
 func (mt *MemTable) findIndex(key []byte) int {
 	return sort.Search(len(mt.entries), func(i int) bool {
 		return bytes.Compare(mt.entries[i].Key, key) >= 0

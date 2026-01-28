@@ -30,8 +30,8 @@ type WAL struct {
 	filePath string
 }
 
-// NewWAL creates a new WAL instance
-// If the file exists, it will be opened in append mode
+// NewWAL creates a new WAL instance. If the file exists, it is opened in append mode.
+// Time: O(1) open. Space: O(1).
 func NewWAL(filePath string) (*WAL, error) {
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
@@ -44,7 +44,7 @@ func NewWAL(filePath string) (*WAL, error) {
 	}, nil
 }
 
-// Close closes the WAL file
+// Close closes the WAL file. Time: O(1). Space: O(1).
 func (w *WAL) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -57,8 +57,8 @@ func (w *WAL) Close() error {
 	return nil
 }
 
-// Append writes an entry to the WAL and syncs to disk
-// This ensures durability before the operation is applied to MemTable
+// Append writes an entry to the WAL and syncs to disk. Ensures durability before applying to MemTable.
+// Time: O(len(key)+len(value)) write + sync. Space: O(1).
 func (w *WAL) Append(entry WALEntry) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -94,8 +94,8 @@ func (w *WAL) Append(entry WALEntry) error {
 	return w.file.Sync()
 }
 
-// Replay reads all entries from the WAL and calls the callback for each entry
-// This is used during startup to recover the MemTable state
+// Replay reads all entries from the WAL and calls the callback for each. Used at startup to recover MemTable state.
+// Time: O(file size) reads + O(N)·cost(callback); N = entry count. Space: O(1) plus callback allocations.
 func (w *WAL) Replay(callback func(WALEntry) error) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -126,7 +126,8 @@ func (w *WAL) Replay(callback func(WALEntry) error) error {
 	return nil
 }
 
-// readEntry reads a single entry from the current file position
+// readEntry reads a single entry from the current file position.
+// Time: O(len(key)+len(value)) read. Space: O(len(key)+len(value)).
 func (w *WAL) readEntry() (WALEntry, error) {
 	var entry WALEntry
 
@@ -160,8 +161,8 @@ func (w *WAL) readEntry() (WALEntry, error) {
 	return entry, nil
 }
 
-// Truncate clears the WAL file
-// This should be called after successfully flushing the MemTable to disk
+// Truncate clears the WAL file. Call after successfully flushing the MemTable to disk.
+// Time: O(1) truncate + sync. Space: O(1).
 func (w *WAL) Truncate() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -184,7 +185,7 @@ func (w *WAL) Truncate() error {
 	return w.file.Sync()
 }
 
-// Size returns the current size of the WAL file in bytes
+// Size returns the current size of the WAL file in bytes. Time: O(1) stat. Space: O(1).
 func (w *WAL) Size() (int64, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()

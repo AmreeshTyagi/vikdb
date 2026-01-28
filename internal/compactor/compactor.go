@@ -27,8 +27,8 @@ func (c *Compactor) ShouldCompact(sstableCount int) bool {
 	return sstableCount >= c.maxFiles
 }
 
-// Compact merges multiple SSTables into a single SSTable
-// Removes duplicates (keeping newest value) and deletes old SSTables
+// Compact merges multiple SSTables into a single SSTable. Removes duplicates (keeping newest value) and deletes old SSTables.
+// Time: O(total entries across all SSTables) reads + O(U log U) sort + write; U = unique keys. Space: O(U) during merge.
 func (c *Compactor) Compact(sstables []*sstable.SSTable, sequenceNum int64) (string, error) {
 	if len(sstables) == 0 {
 		return "", nil
@@ -36,6 +36,10 @@ func (c *Compactor) Compact(sstables []*sstable.SSTable, sequenceNum int64) (str
 
 	allEntries := make(map[string]kv.KeyValue)
 
+	// Read all entries from all SSTables
+	// This can cause OOM if the SSTables are too large
+	// A streaming method would be more efficient
+	// e.g. read sorted iterators from each file and merge and write to a new SSTable
 	for _, sst := range sstables {
 		entries := sst.GetRange(nil, nil)
 		for _, entry := range entries {

@@ -41,8 +41,9 @@ func (s KeyValueSlice) Len() int           { return len(s) }
 func (s KeyValueSlice) Less(i, j int) bool { return string(s[i].Key) < string(s[j].Key) }
 func (s KeyValueSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-// WriteSSTable writes a MemTable to disk as an SSTable
-// Returns the file path of the created SSTable
+// WriteSSTable writes a MemTable to disk as an SSTable. Returns the file path of the created SSTable.
+// Time: O(n log n) if not sorted, else O(n); n = len(entries). Dominated by disk I/O and total entry bytes.
+// Space: O(n) for index entries; disk usage O(total key+value bytes).
 func WriteSSTable(entries []kv.KeyValue, basePath string, sequenceNum int64) (string, error) {
 	if len(entries) == 0 {
 		return "", errors.New("cannot write empty SSTable")
@@ -138,7 +139,8 @@ func WriteSSTable(entries []kv.KeyValue, basePath string, sequenceNum int64) (st
 	return filePath, nil
 }
 
-// OpenSSTable opens an existing SSTable file and loads its index
+// OpenSSTable opens an existing SSTable file and loads its index.
+// Time: O(index entries) disk reads. Space: O(index entries) for in-memory index map.
 func OpenSSTable(filePath string) (*SSTable, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -159,6 +161,8 @@ func OpenSSTable(filePath string) (*SSTable, error) {
 	return sst, nil
 }
 
+// loadIndex reads footer and index from disk into sst.index.
+// Time: O(k) disk reads; k = number of index entries. Space: O(k) for index map.
 func (sst *SSTable) loadIndex() error {
 	footerSize := int64(24)
 	fileInfo, err := sst.file.Stat()
@@ -224,7 +228,8 @@ func (sst *SSTable) loadIndex() error {
 	return nil
 }
 
-// Get retrieves a value by key from the SSTable
+// Get retrieves a value by key from the SSTable.
+// Time: O(1) map lookup + O(1) disk seek/read for one record. Space: O(len(value)).
 func (sst *SSTable) Get(key []byte) ([]byte, bool) {
 	sst.mu.RLock()
 	defer sst.mu.RUnlock()
@@ -260,7 +265,8 @@ func (sst *SSTable) Get(key []byte) ([]byte, bool) {
 	return value, true
 }
 
-// GetRange returns all key-value pairs in the specified range
+// GetRange returns all key-value pairs in the specified range.
+// Time: O(n log n) to sort index keys + O(k) disk reads; n = len(index), k = keys in range. Space: O(k).
 func (sst *SSTable) GetRange(startKey, endKey []byte) []kv.KeyValue {
 	sst.mu.RLock()
 	defer sst.mu.RUnlock()
