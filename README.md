@@ -34,13 +34,13 @@ Install dependencies and dev tools (including [air](https://github.com/air-verse
 
 ```bash
 make install   # install project deps and air
-make build     # build ./vikdb
+make build     # build bin/vikdb
 ```
 
 Or build without the Makefile:
 
 ```bash
-go build ./cmd/vikdb
+mkdir -p bin && go build -o bin/vikdb ./cmd/vikdb
 ```
 
 ## Usage
@@ -48,11 +48,13 @@ go build ./cmd/vikdb
 ### Start the Server
 
 ```bash
-./vikdb -addr :8080 \
+./bin/vikdb -addr :8080 \
         -memtable-max-size 104857600 \
         -wal-path ./data/wal \
         -sstable-dir ./data/sstables
 ```
+
+Or use `make run` (builds `bin/vikdb` and starts it).
 
 ### API Endpoints
 

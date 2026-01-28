@@ -38,7 +38,7 @@ Use three terminals. Each node uses a different API port and replication port. T
 **Terminal 1 – Node 1**
 
 ```bash
-./vikdb \
+./bin/vikdb \
   -addr :8080 \
   -replication-port 8081 \
   -node-id node1 \
@@ -50,7 +50,7 @@ Use three terminals. Each node uses a different API port and replication port. T
 **Terminal 2 – Node 2**
 
 ```bash
-./vikdb \
+./bin/vikdb \
   -addr :8082 \
   -replication-port 8083 \
   -node-id node2 \
@@ -62,7 +62,7 @@ Use three terminals. Each node uses a different API port and replication port. T
 **Terminal 3 – Node 3**
 
 ```bash
-./vikdb \
+./bin/vikdb \
   -addr :8084 \
   -replication-port 8085 \
   -node-id node3 \

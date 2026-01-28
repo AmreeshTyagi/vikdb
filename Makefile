@@ -1,8 +1,11 @@
 # VikDB Makefile
 # Build, run (basic + 3-node cluster), and dev with air
 
-BINARY := vikdb
+BIN_DIR := bin
+BINARY := $(BIN_DIR)/vikdb
+BENCH_BINARY := $(BIN_DIR)/vikdb-bench
 PKG := ./cmd/vikdb
+PKG_BENCH := ./cmd/vikdb-bench
 
 # Basic mode flags (single node, from README)
 ADDR := :8080
@@ -19,7 +22,7 @@ BENCH_RPS        ?= 500
 BENCH_DURATION   ?= 10s
 BENCH_CONCURRENCY ?= 10
 
-.PHONY: build install run run-node1 run-node2 run-node3 run-cluster dev test clean help bench bench-put bench-read bench-range bench-batch bench-delete bench-mixed
+.PHONY: build build-bench install run run-node1 run-node2 run-node3 run-cluster dev test clean help bench bench-put bench-read bench-range bench-batch bench-delete bench-mixed
 
 # Install all project dependencies and dev tools (air)
 install:
@@ -28,9 +31,15 @@ install:
 	go install github.com/air-verse/air@latest
 	@echo "Dependencies and air installed. Ensure $(shell go env GOPATH)/bin is in your PATH for air."
 
-# Build the binary
+# Build the VikDB binary to bin/
 build:
+	@mkdir -p $(BIN_DIR)
 	go build -o $(BINARY) $(PKG)
+
+# Build the benchmark binary to bin/
+build-bench:
+	@mkdir -p $(BIN_DIR)
+	go build -o $(BENCH_BINARY) $(PKG_BENCH)
 
 # Run in basic (single-node) mode
 run: build
@@ -77,34 +86,35 @@ test-v:
 	go test -v ./...
 
 # Benchmark (VikDB must be running). Override: make bench BENCH_RPS=1000 BENCH_DURATION=30s
-bench:
-	go run ./cmd/vikdb-bench -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY)
+bench: build-bench
+	./$(BENCH_BINARY) -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY)
 
 # Per-operation benchmarks (100% single op type)
-bench-put:
-	go run ./cmd/vikdb-bench -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 100 -read 0 -range 0 -batch 0 -delete 0
-bench-read:
-	go run ./cmd/vikdb-bench -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 0 -read 100 -range 0 -batch 0 -delete 0
-bench-range:
-	go run ./cmd/vikdb-bench -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 0 -read 0 -range 100 -batch 0 -delete 0
-bench-batch:
-	go run ./cmd/vikdb-bench -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 0 -read 0 -range 0 -batch 100 -delete 0
-bench-delete:
-	go run ./cmd/vikdb-bench -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 0 -read 0 -range 0 -batch 0 -delete 100
+bench-put: build-bench
+	./$(BENCH_BINARY) -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 100 -read 0 -range 0 -batch 0 -delete 0
+bench-read: build-bench
+	./$(BENCH_BINARY) -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 0 -read 100 -range 0 -batch 0 -delete 0
+bench-range: build-bench
+	./$(BENCH_BINARY) -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 0 -read 0 -range 100 -batch 0 -delete 0
+bench-batch: build-bench
+	./$(BENCH_BINARY) -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 0 -read 0 -range 0 -batch 100 -delete 0
+bench-delete: build-bench
+	./$(BENCH_BINARY) -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 0 -read 0 -range 0 -batch 0 -delete 100
 
 # Mixed workload (put 40%, read 30%, range 10%, batch 10%, delete 10%). Load data first with bench-put.
-bench-mixed:
-	go run ./cmd/vikdb-bench -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 40 -read 30 -range 10 -batch 10 -delete 10
+bench-mixed: build-bench
+	./$(BENCH_BINARY) -addr $(BENCH_ADDR) -rps $(BENCH_RPS) -duration $(BENCH_DURATION) -concurrency $(BENCH_CONCURRENCY) -put 40 -read 30 -range 10 -batch 10 -delete 10
 
-# Remove built binary and tmp dir used by air
+# Remove built binaries and tmp dir used by air
 clean:
-	rm -f $(BINARY)
+	rm -rf $(BIN_DIR)
 	rm -rf ./tmp
 
 help:
 	@echo "VikDB targets:"
 	@echo "  make install   - install project deps (go mod) and air"
-	@echo "  make build     - build ./vikdb"
+	@echo "  make build     - build bin/vikdb"
+	@echo "  make build-bench - build bin/vikdb-bench"
 	@echo "  make run        - run single-node (basic) mode"
 	@echo "  make run-node1  - run cluster node 1 (API :8080, RPC :8081)"
 	@echo "  make run-node2  - run cluster node 2 (API :8082, RPC :8083)"
