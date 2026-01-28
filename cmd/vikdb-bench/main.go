@@ -21,7 +21,7 @@ func main() {
 	addr := flag.String("addr", "localhost:8080", "VikDB HTTP address (e.g. localhost:8080)")
 	rps := flag.Int("rps", 500, "Target requests per second")
 	duration := flag.Duration("duration", 10*time.Second, "Benchmark duration (e.g. 10s, 1m)")
-	concurrency := flag.Int("concurrency", 10, "Number of worker goroutines")
+	concurrency := flag.Int("concurrency", 5, "Number of worker goroutines")
 
 	putPct := flag.Int("put", 100, "Put ratio 0-100 (default 100 = put-only)")
 	readPct := flag.Int("read", 0, "Read ratio 0-100")
